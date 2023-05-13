@@ -1,96 +1,30 @@
-const WIDTH = 640 
-const HEIGHT = 640
-
-let canvas = document.getElementById("canvas")
-canvas.width = WIDTH
-canvas.height = HEIGHT
-let ctx = canvas.getContext("2d")
-
-let view = document.getElementById("view")
-let ctxView = view.getContext("2d")
-view.width = WIDTH
-view.height = HEIGHT
-
-let kart = new Kart(70, 350, 20, 50)
-
-let turnLeft = false
-let turnRight = false 
-let ride = false
-let speed = 0.0
-let map = undefined
-let kartImage = undefined
-
-async function render()
-{
-    ctx.drawImage(map, 0, 0, WIDTH, HEIGHT)
-    ctxView.clearRect(0, 0, WIDTH, HEIGHT)
-    ctxView.save()
-    ctxView.translate(WIDTH/2, HEIGHT/2)
-    ctxView.scale(8, 8)
-    ctxView.drawImage(map, -kart.cx, -kart.cy, WIDTH, HEIGHT)
-    ctxView.restore()
-    ctxView.save()
-    ctxView.translate(WIDTH/2, HEIGHT/2)
-    ctxView.rotate(Transform.radian(kart.angle))
-    ctxView.drawImage(kartImage, -kart.width*2, -kart.height, kart.width*4, kart.height*2)
-    ctxView.restore()
-    kart.draw(ctx)
-
-}
-
-async function update()
-{
-    if(turnRight)
-        kart.rotate(4)
-    if(turnLeft)
-        kart.rotate(-4)
-    if(ride)
-    {
-        if(speed < 2.0)
-        {
-            speed += 0.1
-        }
-    }
-    else
-    {
-        if(speed > 0)
-        {
-            speed -= 0.1
-        }
-        else 
-            speed = 0
-    }
-    kart.ride(speed)
-}
-
 async function main()
 {
-    map = await loadImage("map.png")
-    kartImage = await loadImage("kart.png")
+    /**
+     * Setting up the canvases used for the rendering
+     */
+    Engine.use_canvas("canvas", "view")
+    
+    /**
+     * Loading map
+     */
+    Engine.map = await ImageLoader.load("map.png")
 
-    window.addEventListener("keydown", (event) => {
-        if(event.key == "d")
-            turnRight = true
-        if(event.key == "q")
-            turnLeft = true 
-        if(event.key == "z")
-            ride = true
-    })
+    /**
+     * Setting up player kart with it position of the map and the sprite used rendered on the projected player view
+     */
+    Engine.player_kart = new Kart(70, 350, 15, 30, await ImageLoader.load("kart.png")) 
 
-    window.addEventListener("keyup", (event) => {
-        if(event.key == "d")
-            turnRight = false
-        if(event.key == "q")
-            turnLeft = false 
-        if(event.key == "z")
-            ride = false
-    })
+    /**
+     * Activate basics inputs (Z to ride, D to turn right, Q to turn left)
+     */
+    Engine.activate_base_inputs_keys()
 
-    setInterval(()=>
-    {
-        update()
-        render()
-    }, 16)
+    /**
+     * Start engine
+     */
+    Engine.engine_start()
 }
+
 
 main()
