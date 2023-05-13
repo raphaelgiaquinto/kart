@@ -28,6 +28,11 @@ async function main()
      */
     Engine.activate_base_inputs_keys()
 
+    /**
+     * Adding new collision detection
+     * When the pixel is black (see collisions_map.png),
+     * return true
+     */
     Engine.add_collision_detection((pixel) => 
     {
         return pixel[0] == 0 && pixel[1] == 0 && pixel[2] == 0
