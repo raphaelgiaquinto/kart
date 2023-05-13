@@ -36,8 +36,8 @@ let Transform =
 }
 
 /***
- * Represents a kart riding on the map
- * Basicaly, a kart is represented by 4 points in 2d, each represents a coordinate on the map
+ * Represents a kart riding on the map.
+ * Basicaly, a kart is represented by 4 points in 2d, each represents a coordinate on the map (top left/right, bottom left/right)
  */
 let Kart = function(center_x, center_y, width, height, sprite)
 {
@@ -52,6 +52,7 @@ let Kart = function(center_x, center_y, width, height, sprite)
     this.speed_limit = 2.0
     this.speed_step = 0.1
     this.is_riding = false 
+    this.is_riding_back = false
     this.turning_left = false 
     this.turning_right = false
     this.sprite = sprite
@@ -87,11 +88,19 @@ let Kart = function(center_x, center_y, width, height, sprite)
         this.bry = this.cy + this.height / 2
     }
 
-    this.ride = function(speed)
+    this.compute_next_position = function()
+    {
+        let dx = this.dirx * this.speed
+        let dy = this.diry * this.speed
+
+        return {x: this.cx + dx, y: this.cy + dy}
+    }
+
+    this.ride = function()
     {
 
-        let dx = this.dirx * speed
-        let dy = this.diry * speed
+        let dx = this.dirx * this.speed
+        let dy = this.diry * this.speed
 
         //center
         this.cx += dx
@@ -156,24 +165,61 @@ let Kart = function(center_x, center_y, width, height, sprite)
         this.rotate(this.speed*2)
     }
 
-    this.update = function()
+    this.kart_riding_state = function()
     {
         if(this.is_riding)
         {
+            if(this.speed_step < 0)
+            {
+                this.speed_step *= -1
+            }
+
             if(this.speed < this.speed_limit)
             {
                 this.speed += this.speed_step
             }
         }
-        else
+        else if(this.is_riding_back)
         {
-            if(this.speed > 0)
+            if(this.speed_step > 0)
             {
-                this.speed -= this.speed_step
+                this.speed_step *= -1
+            }
+
+            if(this.speed > -this.speed_limit)
+            {
+                this.speed += this.speed_step
+            }
+        }
+
+        return this.is_riding || this.is_riding_back
+    }
+    
+    this.update = function()
+    {   
+        if(!this.kart_riding_state())
+        {
+            if(this.speed_step > 0)
+            {
+                if(this.speed > 0)
+                {
+                    this.speed -= this.speed_step
+                }
+                else 
+                {
+                    this.speed = 0
+                }
             }
             else
             {
-                this.speed = 0
+                if(this.speed < 0)
+                {
+                    this.speed -= this.speed_step
+                }
+                else 
+                {
+                    this.speed = 0
+                }
             }
         }
 
@@ -185,8 +231,6 @@ let Kart = function(center_x, center_y, width, height, sprite)
         {
             this.turn_right()
         }
-
-        this.ride(this.speed)
     }
 
     this.initCoords()
@@ -200,8 +244,8 @@ let Kart = function(center_x, center_y, width, height, sprite)
  */
 let Engine = 
 {
-    global: { canvas: undefined, ctx: undefined},
-    view: { canvas: undefined, ctx: undefined},
+    global: { canvas: undefined, ctx: undefined, collisions_ctx: undefined },
+    view: { canvas: undefined, ctx: undefined },
     inputs: [],
     karts: [],
     player_kart: undefined,
@@ -210,14 +254,14 @@ let Engine =
     {
         FORWARD: "z",
         LEFT: "q",
-        RIGHT: "d"
+        RIGHT: "d",
+        BACK: "s"
     },
-
+    collisions:[],
     use_canvas : function(global_id, view_id)
     {
         this.global.canvas = document.getElementById(global_id)
         this.view.canvas = document.getElementById(view_id)
-
         this.global.ctx = this.global.canvas.getContext("2d")
         this.view.ctx = this.view.canvas.getContext("2d")
     },
@@ -251,6 +295,12 @@ let Engine =
     {
         this.karts.forEach(kart => kart.update())
         this.player_kart.update()
+        let {x, y} = this.player_kart.compute_next_position()
+        let colliding = this.is_colliding(x, y)
+        if(!colliding)
+        {
+            this.player_kart.ride()
+        }
     },
 
     render_kart_on_game_view : function()
@@ -274,6 +324,36 @@ let Engine =
         this.view.ctx.restore()
     },
 
+    add_collision_detection : function(predicate)
+    {
+        this.collisions.push(predicate)
+    },
+
+    is_colliding(x, y)
+    {
+        return this.collisions.some(collision => collision(this.extract_pixel_from_collisions_map(x, y)))
+    },
+
+    load_collisions_map : function(collisions_map)
+    {
+        let tmp = document.createElement("canvas")
+        tmp.width = this.global.canvas.width
+        tmp.height = this.global.canvas.height
+        this.global.collisions_ctx = tmp.getContext("2d")
+        this.global.collisions_ctx.drawImage(collisions_map, 0, 0, tmp.width, tmp.height)
+    },
+
+
+    extract_pixel_from_collisions_map : function(x, y)
+    {
+        let pixel = this.global.collisions_ctx.getImageData(parseInt(x), parseInt(y), 1, 1)
+        if(pixel)
+        {
+            return [pixel.data[0], pixel.data[1], pixel.data[2]]     
+        }
+        return undefined
+    },
+
     render_global_view : function()
     {
         this.global.ctx.drawImage(this.map, 0, 0, this.global.canvas.width, this.global.canvas.height)
@@ -281,12 +361,12 @@ let Engine =
         this.player_kart.draw(this.global.ctx)
     },
 
-    render_game_view: function()
+    render_game_view : function()
     {
         this.render_kart_on_game_view()
     },
 
-    activate_base_inputs_keys: function()
+    activate_base_inputs_keys : function()
     {
         this.register_input(this.keys.FORWARD, true, () =>
         {
@@ -297,7 +377,17 @@ let Engine =
         {
             this.player_kart.is_riding = false
         })
+        
+        this.register_input(this.keys.BACK, true, () =>
+        {
+            this.player_kart.is_riding_back = true
+        })
     
+        this.register_input(this.keys.BACK, false, () =>
+        {
+            this.player_kart.is_riding_back = false
+        })
+
         this.register_input(this.keys.LEFT, true, () =>
         {
             this.player_kart.turning_left = true
