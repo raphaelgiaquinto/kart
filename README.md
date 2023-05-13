@@ -5,9 +5,9 @@ author: raphael giaquinto
 
 
 ## About ##
-Basic engine used to create kart games, including a top view system based on JavaScript canvases translation and scaling features.
+Basic engine used to create kart games, including a top view system based on JavaScript canvases. **It uses only JavaScript, without libraries**.
 
-At this day, the engine can:
+Features:
 - handle **projection of a map** (global view and top view), 
 - **player inputs** and **karts movements** with acceleration and deceleration feelings. 
 - **Collisions** and **triggers** using a simple pixels mask system, which represents regions of interest of the map.
